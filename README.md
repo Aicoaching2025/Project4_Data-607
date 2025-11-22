@@ -32,7 +32,7 @@ Use a different labeled dataset of personal choice
 **Categories:** Inbox, Promotions, Social, Updates (4-class problem)  
 **Goal:** Understand whether machine learning could automate my email organization
 
-### Part 2: Spam/Ham Classification 🔄 **IN PROGRESS**
+### Part 2: Spam/Ham Classification 🔄 
 **Dataset:** Public spam corpus (10,000+ emails)  
 **Categories:** Spam, Ham (2-class problem)  
 **Goal:** Compare performance against established benchmarks and test hypothesis about problem complexity
@@ -166,11 +166,6 @@ predict_email <- function(subject, body_text) {
 ✅ Identified category-specific performance patterns  
 ✅ Gained insights into text similarity challenges  
 
-**Challenges:**
-❌ Overall 55% accuracy insufficient for reliable production use  
-❌ Three categories too similar for effective discrimination  
-❌ Personal email patterns may not generalize well  
-❌ Limited training data per category  
 
 **Critical Insight:**
 > *The choice of classification problem matters as much as the model itself. Some categorization schemes are inherently more difficult than others due to vocabulary overlap, regardless of model sophistication.*
@@ -188,7 +183,6 @@ Based on findings from Part 1, I hypothesize that spam/ham classification will a
 - Fewer decision boundaries to learn
 - Reduced probability of confusion
 - More focused feature learning
-
 
 
 ### Planned Methodology
@@ -221,7 +215,6 @@ Will directly compare:
 - Precision (spam): >90%
 - Recall (spam): >85%
 - F1-Score: >87%
-
 
 
 ---
