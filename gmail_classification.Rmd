@@ -1,0 +1,652 @@
+---
+title: "Email Classification Project"
+author: "Candace Grant"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+
+## Load Libraries
+
+```{r libraries}
+library(tidyverse)
+library(tidytext)
+library(tm)
+library(caret)
+library(e1071)
+library(yardstick)
+```
+
+---
+
+## Load Data
+
+```{r}
+# Load INBOX (may be split into multiple files)
+inbox_files <- list.files(pattern = "^inbox.*\\.csv$")
+if (length(inbox_files) > 0) {
+  inbox <- map_df(inbox_files, read_csv, show_col_types = FALSE) %>%
+    mutate(category = "inbox")
+  cat("Loaded", length(inbox_files), "inbox file(s)\n")
+} else {
+  inbox <- tibble()
+}
+
+# Load PROMOTIONS (single file)
+if (file.exists("promotions.csv")) {
+  promotions <- read_csv("promotions.csv", show_col_types = FALSE) %>%
+    mutate(category = "promotions")
+  cat("Loaded promotions.csv\n")
+} else {
+  promotions <- tibble()
+}
+
+# Load SOCIAL (single file)
+if (file.exists("social.csv")) {
+  social <- read_csv("social.csv", show_col_types = FALSE) %>%
+    mutate(category = "social")
+  cat("Loaded social.csv\n")
+} else {
+  social <- tibble()
+}
+
+# Load UPDATES (may be split into multiple files)
+updates_files <- list.files(pattern = "^updates.*\\.csv$")
+if (length(updates_files) > 0) {
+  updates <- map_df(updates_files, read_csv, show_col_types = FALSE) %>%
+    mutate(category = "updates")
+  cat("Loaded", length(updates_files), "updates file(s)\n")
+} else {
+  updates <- tibble()
+}
+
+# Combine all
+emails_raw <- bind_rows(inbox, promotions, social, updates)
+
+cat("\nTotal emails loaded:", nrow(emails_raw), "\n")
+cat("\nEmails per category:\n")
+print(table(emails_raw$category))
+```
+
+---
+
+## Clean Data
+
+```{r}
+emails_clean <- emails_raw %>%
+  mutate(
+    full_text = paste(Subject, `Body Text`, sep = " "),
+    full_text = str_to_lower(full_text),
+    full_text = str_replace_all(full_text, "<[^>]+>", " "),
+    full_text = str_replace_all(full_text, "http\\S+|www\\S+", ""),
+    full_text = str_replace_all(full_text, "\\S+@\\S+", ""),
+    full_text = str_replace_all(full_text, "[^a-z\\s]", " "),
+    full_text = str_replace_all(full_text, "\\s+", " "),
+    full_text = str_trim(full_text),
+    category = as.factor(category),
+    text_length = str_count(full_text, "\\S+")
+  ) %>%
+  filter(!is.na(full_text), full_text != "", text_length > 5) %>%
+  select(category, full_text, text_length, Subject, `From Email`)
+
+cat("Emails after cleaning:", nrow(emails_clean), "\n")
+```
+
+---
+
+## Balance Dataset
+
+```{r}
+set.seed(643)
+
+emails_balanced <- emails_clean %>%
+  group_by(category) %>%
+  sample_n(size = min(800, n()), replace = FALSE) %>%
+  ungroup()
+
+cat("Emails after balancing:\n")
+print(table(emails_balanced$category))
+```
+
+---
+
+## Exploratory Plots
+
+```{r}
+# Distribution
+ggplot(emails_balanced, aes(x = category, fill = category)) +
+  geom_bar() +
+  geom_text(stat = "count", aes(label = after_stat(count)), vjust = -0.5) +
+  theme_minimal() +
+  labs(title = "Email Distribution by Category") +
+  theme(legend.position = "none")
+ggsave("email_distribution.png", width = 8, height = 6)
+
+# Length distribution
+ggplot(emails_balanced, aes(x = text_length, fill = category)) +
+  geom_density(alpha = 0.5) +
+  scale_x_log10() +
+  theme_minimal() +
+  labs(title = "Email Length Distribution", x = "Word Count (log)", y = "Density")
+ggsave("email_length_distribution.png", width = 10, height = 6)
+
+# Top words
+top_words <- emails_balanced %>%
+  unnest_tokens(word, full_text) %>%
+  anti_join(stop_words, by = "word") %>%
+  count(category, word, sort = TRUE) %>%
+  group_by(category) %>%
+  slice_max(n, n = 10)
+
+ggplot(top_words, aes(x = reorder_within(word, n, category), y = n, fill = category)) +
+  geom_col() +
+  facet_wrap(~category, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  theme_minimal() +
+  labs(title = "Top 10 Words by Category", x = NULL, y = "Frequency") +
+  theme(legend.position = "none")
+ggsave("top_words_by_category.png", width = 12, height = 8)
+```
+
+---
+
+## Train/Test Split
+
+```{r}
+set.seed(643)
+
+train_index <- createDataPartition(emails_balanced$category, p = 0.8, list = FALSE)
+train_data <- emails_balanced[train_index, ]
+test_data <- emails_balanced[-train_index, ]
+
+cat("Training set:", nrow(train_data), "emails\n")
+cat("Test set:", nrow(test_data), "emails\n")
+print(table(train_data$category))
+```
+
+---
+
+## Create TF-IDF Features
+
+```{r}
+corpus_train <- VCorpus(VectorSource(train_data$full_text))
+corpus_test <- VCorpus(VectorSource(test_data$full_text))
+
+dtm_train <- DocumentTermMatrix(
+  corpus_train,
+  control = list(
+    weighting = weightTfIdf,
+    removePunctuation = TRUE,
+    removeNumbers = TRUE,
+    stopwords = TRUE,
+    stemming = FALSE,
+    bounds = list(global = c(5, Inf)))
+  )
+
+
+# Keep top 500 features
+term_freq <- colSums(as.matrix(dtm_train))
+top_terms <- names(sort(term_freq, decreasing = TRUE)[1:500])
+dtm_train <- dtm_train[, top_terms]
+
+# Apply to test set
+dtm_test <- DocumentTermMatrix(
+  corpus_test,
+  control = list(
+    weighting = weightTfIdf,
+    removePunctuation = TRUE,
+    removeNumbers = TRUE,
+    stopwords = TRUE,
+    stemming = FALSE,
+    dictionary = top_terms
+  )
+)
+
+train_features <- as.data.frame(as.matrix(dtm_train))
+train_features$category <- train_data$category
+
+test_features <- as.data.frame(as.matrix(dtm_test))
+test_features$category <- test_data$category
+
+cat("Training features:", ncol(train_features) - 1, "terms\n")
+```
+
+---
+
+## Train Naive Bayes Model
+
+```{r}
+cat("Training Naive Bayes model...\n")
+nb_model <- naiveBayes(category ~ ., data = train_features)
+cat("Training complete!\n")
+```
+
+---
+
+## Evaluate Model
+
+```{r}
+predictions <- predict(nb_model, test_features)
+cm <- confusionMatrix(predictions, test_features$category)
+
+print(cm)
+
+# Plot confusion matrix
+cm_df <- as.data.frame(cm$table)
+ggplot(cm_df, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq), color = "white", size = 6) +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  theme_minimal() +
+  labs(title = "Confusion Matrix - Naive Bayes", x = "Actual", y = "Predicted")
+ggsave("confusion_matrix_naive_bayes.png", width = 8, height = 6)
+
+# Per-class metrics
+cat("\nPer-class Performance:\n")
+print(cm$byClass[, c("Sensitivity", "Specificity", "Precision", "F1")])
+```
+
+## Error Analysis
+
+```{r}
+
+
+errors <- test_data %>%
+  mutate(
+    predicted = predictions,
+    actual = test_features$category,
+    correct = predicted == actual
+  ) %>%
+  filter(!correct)
+
+# Calculate metrics
+total_errors <- nrow(errors)
+total_test <- nrow(test_data)
+accuracy <- mean(predictions == test_features$category) * 100
+
+cat("======================================================================\n")
+cat("ERROR ANALYSIS SUMMARY\n")
+cat("======================================================================\n\n")
+
+cat("Total test emails:", total_test, "\n")
+cat("Correctly classified:", total_test - total_errors, 
+    paste0("(", round((total_test - total_errors)/total_test * 100, 1), "%)"), "\n")
+cat("Misclassified:", total_errors, 
+    paste0("(", round(total_errors/total_test * 100, 1), "%)"), "\n")
+cat("\nOverall Accuracy:", round(accuracy, 2), "%\n\n")
+
+# Most common misclassifications with percentages
+cat("Most Common Misclassifications:\n")
+cat("----------------------------------------------------------------------\n")
+error_summary <- errors %>% 
+  count(actual, predicted, sort = TRUE) %>%
+  mutate(
+    percentage = round(n / total_errors * 100, 1),
+    description = paste0(actual, " → ", predicted, ": ", n, " errors (", percentage, "% of all errors)")
+  )
+
+for(i in 1:min(10, nrow(error_summary))) {
+  cat(i, ". ", error_summary$description[i], "\n", sep = "")
+}
+
+# Sample misclassified emails
+cat("\n======================================================================\n")
+cat("SAMPLE MISCLASSIFIED EMAILS\n")
+cat("======================================================================\n")
+
+for (i in 1:min(5, nrow(errors))) {
+  cat("\n--- Email", i, "---\n")
+  cat("ACTUAL:", toupper(as.character(errors$actual[i])), 
+      "| PREDICTED:", toupper(as.character(errors$predicted[i])), "\n")
+  cat("Subject:", substr(errors$Subject[i], 1, 70), "...\n")
+  cat("Preview:", substr(errors$full_text[i], 1, 100), "...\n")
+}
+
+cat("\n======================================================================\n")
+```
+
+## Test New Emails
+
+
+```{r}
+predict_email <- function(subject, body_text) {
+  full_text <- paste(subject, body_text, sep = " ")
+  
+  clean_text <- full_text %>%
+    str_to_lower() %>%
+    str_replace_all("<[^>]+>", " ") %>%
+    str_replace_all("http\\S+|www\\S+", "") %>%
+    str_replace_all("\\S+@\\S+", "") %>%
+    str_replace_all("[^a-z\\s]", " ") %>%
+    str_replace_all("\\s+", " ") %>%
+    str_trim()
+  
+  test_corpus <- VCorpus(VectorSource(clean_text))
+  test_dtm <- DocumentTermMatrix(
+    test_corpus,
+    control = list(
+      weighting = weightTfIdf,
+      removePunctuation = TRUE,
+      removeNumbers = TRUE,
+      stopwords = TRUE,
+      stemming = FALSE,
+      dictionary = top_terms
+    )
+  )
+  
+  test_feat <- as.data.frame(as.matrix(test_dtm))
+  
+  missing_cols <- setdiff(colnames(train_features)[-ncol(train_features)], colnames(test_feat))
+  for(col in missing_cols) {
+    test_feat[[col]] <- 0
+  }
+  
+  test_feat <- test_feat[, colnames(train_features)[-ncol(train_features)]]
+  
+  prediction <- predict(nb_model, test_feat)
+  return(as.character(prediction))
+}
+
+# Test samples
+cat("\nTesting sample emails:\n\n")
+
+cat("Sample 1: Promotional\n")
+result1 <- predict_email("Limited Time - 50% Off!", "Don't miss our biggest sale! Use code SAVE50.")
+cat("Predicted:", result1, "\n\n")
+
+cat("Sample 2: Social\n")
+result2 <- predict_email("John commented on your photo", "John Doe commented: Great pic!")
+cat("Predicted:", result2, "\n\n")
+
+cat("Sample 3: Update\n")
+result3 <- predict_email("Your order has shipped", "Your order has been shipped via UPS. Track it here.")
+cat("Predicted:", result3, "\n\n")
+
+cat("Sample 4: Inbox\n")
+result4 <- predict_email("Re: Meeting tomorrow", "Hi, confirming our meeting at 2pm tomorrow.")
+cat("Predicted:", result4, "\n\n")
+```
+### Testing my emails
+
+```{r}
+# ADD YOUR REAL EMAILS HERE:
+
+cat("MY REAL EMAIL 1: LOFT Promotional\n")
+my_subject1 <- "FINAL HOURS: $45 jeans (+ 44% off even more!)"
+my_body1 <- "
+
+WOMEN SHOES HANDBAGS JEWELRY & ACCESSORIES BEAUTY MEN KIDS HOME SALE
+Free standard shipping for everyone through 12/22! Order before 5:00PM ET that day to get your gifts by 12/25.
+hero
+info
+women
+shoes
+handbags
+jacc
+fj
+men
+kids
+home
+sale
+gifts
+loyallists
+infoexcl
+ 
+shop
+ 
+Designer Styles up to 40% off
+ 
+3x
+info
+shop
+become
+ 
+Beauty
+ 
+
+Buy Online, Pick Up In Store		Shop Now
+ 
+CONNECT WITH US
+
+   
+
+   
+
+   
+
+ 
+ 
+GET OUR APP
+
+
+STORES & EVENTS
+ 
+CUSTOMER SERVICE
+ 
+CREDIT SERVICES
+ 
+LOYALLIST
+PRIVACY POLICY
+ 
+RETURN POLICY
+ 
+CUSTOMER BILL OF RIGHTS
+ 
+UNSUBSCRIBE
+Don't miss a thing! Add bloomingdales.com to your address book.
+© 2025 Bloomingdale's. 1000 Third Avenue New York, NY, 10022-3902, US.
+Beauty Offer: 
+Take $25 off every $200 you spend on select beauty items labeled Take $25 off every $200: Discount applied in bag, online; see sales associate for information regarding eligible items in store. All other items are excluded from the offer. Discount will automatically be applied in bag on qualified items. Offer valid online and in U.S. stores only November 18- 23, 2025. No adjustments to prior purchases. You are not eligible for the offer if you pay with a card that is eligible for a colleague discount offered by Bloomingdale's or its affiliates. Offer not valid in Bloomingdale's The Outlet Store.
+FREE SHIPPING:
+
+Receive free standard shipping on online orders placed between 11/4/25 at 12:00AM and 12/22/25 at 5:00PM EST. Exceptions where items may not arrive by 12/25/25: Direct from the vendor, Third-Party Sellers, Special order, On order, and Pre-Order. See product details page and bag for more information. Free standard shipping on bloomingdales.com purchases shipped to a single U.S. address, excluding furniture, mattresses and rugs. Offer not valid on prior purchases. In store free shipping offer only applies to merchandise that is not available in the store where the order is placed, but available at another Bloomingdale's Department Store location. Additional delivery charges may apply for expedited shipping.
+
+You're currently registered to receive emails at cgrantrock@gmail.com. This message was sent to you by Bloomingdale's. To unsubscribe from future bloomingdales.com marketing emails click above.
+
+Please note that if you unsubscribe from bloomingdales.com marketing emails you may continue to receive certain transactional emails from Bloomingdale's regarding a purchase you made from Bloomingdale's (i.e.-E-receipts, shipping confirmation) or email alerts that you have signed up to receive from Citibank, N.A. (CBNA) regarding your Bloomingdale's Credit Account. To opt-out or change your communication preferences regarding your Credit Account visit My Bloomingdale's Credit Card and sign in to your account. Once signed in click Manage Credit Alerts.."
+result_real1 <- predict_email(my_subject1, my_body1)
+cat("Predicted:", result_real1, "\n\n")
+
+cat("MY REAL EMAIL 2: Primary Inbox\n")
+my_subject2 <- "Your Wednesday morning trip with Uber"
+my_body2 <- "	
+Nov 19, 2025
+6:45 AM
+Thanks for riding, Candace
+
+We hope you enjoyed your ride this morning.
+
+Total	$11.95
+ 
+
+Learn more about the government-mandated pricing rules, taxes, and fees that make trips in NYC more expensive.
+Trip fare	$10.68
+NY State Black Car Fund 	$0.27
+New York State Benefits Surcharge 	$0.05
+Sales Tax 	$0.95
+ 
+Payments
+	
+Mastercard xxxxxxxx	$11.95
+11/19/25 5:45 PM	
+ 
+Want to switch your payment method?	
+	Switch
+ 
+Download the receipt in a PDF format	
+	Download PDF
+ 
+Trip details
+	
+UberX
+0.89 miles, 8 minutes
+License Plate:
+T114073C
+			
+6:57 AM
+29 Sunnyside Ct, Brooklyn, NY 11207-2112, US
+			
+7:06 AM
+Van Sinderen Ave, Brooklyn, NY 11201, US
+
+You rode with ALHASSANE	4.97	
+Say thanks with a rating or tip for the driver.
+	Rate or tip
+FHV License Number:	5541429
+ 
+Affiliated with UBER USA, LLC (B03404)	
+ 
+Dispatched by UBER USA, LLC (B03404)	
+ 
+When you ride with Uber, your trips are insured in case of a covered accident.	Learn more
+ 
+Driver's TLC License Number:	6077131
+ 
+Want to review your trip history?	My trips
+ 
+Need help?
+Our support team is happy to help with any concern you might have.
+	Contact support
+Forgot something?
+If you lost a item in the car, please report it using the link below.
+	Report lost item
+Uber Technologies
+1725 3rd Street,
+San Francisco, California 94158	
+My Account
+Privacy policy
+Terms and Conditions
+	
+		
+"
+result_real2 <- predict_email(my_subject2, my_body2)
+cat("Predicted:", result_real2, "\n\n")
+
+cat("MY REAL EMAIL 3: Social\n")
+my_subject3 <- "Kelani Posted a New Photo on Facebook"
+my_body3 <- "Conversation opened. 1 unread message.
+
+Skip to content
+Using Gmail with screen readers
+2 of 207
+📷 Kelan Holder recently posted a new photo
+Inbox
+
+Kelan on Facebook <friendupdates@facebookmail.com> Unsubscribe
+3:38 PM (5 hours ago)
+to me
+
+ 
+Candace, here's Kelan Holder's new photo that he recently posted.
+   
+ 
+
+   
+
+   
+
+   
+ 
+   
+   
+ 
+
+   
+📷 Kelan Holder added a new photo.
+November 21 at 1:27 PM
+ 
+View photo
+ 
+
+   
+4 people reacted to this.
+ 
+   
+   
+Was this email:Useful | Not Useful
+ 
+   
+   
+ 
+This message was sent to cgrantrock@gmail.com. If you don't want to receive these emails from Meta in the future, please unsubscribe.
+Meta Platforms, Inc., Attention: Community Support, 1 Meta Way, Menlo Park, CA 94025
+   
+   
+To help keep your account secure, please don't forward this email. Learn more
+   
+ 
+
+"
+result_real3 <- predict_email(my_subject3, my_body3)
+cat("Predicted:", result_real3, "\n\n")
+
+cat("MY REAL EMAIL 4: Updates\n")
+my_subject4 <- "Updates on Your Partnership with Yotel"
+my_body4 <- "
+
+JetBlue <jetblueairways@email.jetblue.com> Unsubscribe
+1:17PM (7 hours ago)
+to me
+
+Our partnership is ending. Book by 12/31 to earn points.	View in a web browser
+JetBlue
+Jetblue and YOTEL logos.
+Hi, Candace.
+
+We wanted to let you know that our loyalty partnership with YOTEL will be coming to an end.
+
+The last day you can book on YOTEL to earn TrueBlue points will be 12/31/25. The deadline to submit any requests for retroactive TrueBlue points on YOTEL stays is also 12/31/25. We apologize for any inconvenience.
+
+You can continue to earn TrueBlue points on a la carte hotels and stays through our partnership with IHG Hotels & Resorts, as well as with TrueBlue partners.
+
+Thanks for your continued loyalty and understanding.
+
+The TrueBlue Team
+All things travel, all from JetBlue.
+JetBlue Flights	JetBlue Vacations Packages	Paisly by JetBlue
+TrueBlue Points and Perks	JetBlue Card
+Let's stay connected. Download the JetBlue app.	
+Instagram	Facebook	X	YouTube
+Preference Center | Help | Business Travel | Privacy | About JetBlue
+Add jetblueairways@email.jetblue.com to your address book to ensure delivery to your inbox.
+
+This e-mail was sent to cgrantrock@gmail.com. To update your preferences or unsubscribe from future JetBlue emails please click here. We're sorry but email sent in reply to this message will not be answered. If you have questions, please visit the Help section at jetblue.com. JetBlue Airways, 27-01 Queens Plaza North, Long Island City, NY 11101.
+©2025 JetBlue Airways Corporation
+"
+result_real4 <- predict_email(my_subject4, my_body4)
+cat("Predicted:", result_real3, "\n\n")
+```
+### Save the Model for Future Use
+
+```{r}
+# Save model and data for Shiny app
+cat("Saving model for Shiny app...\n")
+saveRDS(nb_model, "nb_model.rds")
+saveRDS(top_terms, "top_terms.rds")
+saveRDS(train_features, "train_features.rds")
+cat("Model saved! Ready for Shiny app.\n")
+```
+
+## Summary
+
+This project successfully implemented a **Naive Bayes email classifier** that:
+
+- Processed and balanced 3,200 emails across 4 categories
+- Achieved **`r round(cm$overall["Accuracy"]*100, 1)`% accuracy** on test data
+- Used TF-IDF features with 500 most important terms
+- Can predict categories for new, unseen emails
+
+The Naive Bayes classifier is well-suited for text classification due to its:
+- Computational efficiency
+- Strong performance on high-dimensional sparse data
+- Probabilistic interpretation of predictions
+
+**Project Enhanced to Make a Shiny App**
+
+
+
