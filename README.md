@@ -25,7 +25,7 @@ Use a different labeled dataset of personal choice
 
 ## 🎯 Project Structure
 
-### Part 1: Personal Inbox Classification ✅ **COMPLETED**
+### Part 1: Personal Inbox Classification ✅ Link to Part1 Rpubs file: https://rpubs.com/Candace63/GmailClassifier
 **Dataset:** My personal Gmail archive (3,200 emails)  
 **Categories:** Inbox, Promotions, Social, Updates (4-class problem)  
 **Goal:** Understand whether machine learning could automate my email organization
@@ -56,12 +56,6 @@ Use a different labeled dataset of personal choice
 - **Algorithm:** Naive Bayes classifier (suited for text classification)
 - **Split:** 80% training (2,560 emails), 20% testing (640 emails)
 - **Sampling:** Stratified to maintain class proportions
-
-**Evaluation Metrics**
-- Overall accuracy
-- Per-class precision, recall, F1-score
-- Confusion matrix analysis
-- Error pattern investigation
 
 ### Overall Performance
 - **Overall Accuracy:** 55.0%
@@ -118,14 +112,8 @@ These terms rarely appear in other email categories, creating clear decision bou
 
 All three contain "order", "shipping", and calls-to-action, making them linguistically similar.
 
-### Finding 3: Small Dataset Limitations
 
-With only 800 training samples per category (2,560 total):
-- **Feature/sample ratio:** 500 features ÷ 2,560 samples = 0.20
-- Risk of overfitting to personal email patterns
-- May not generalize to other users' email habits
-
-### Deployment: Interactive Shiny Application
+## Deployment: Interactive Shiny Application
 
 Created a production-ready web application featuring:
 - **Real-time classification** of user-input emails
