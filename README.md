@@ -85,9 +85,9 @@ I chose to tackle my personal email organization as the "ambitious" option becau
 | Category | Precision | Recall | F1-Score | Accuracy | Observations |
 |----------|-----------|--------|----------|----------|--------------|
 | **Social** | 0.87 | 0.87 | 0.87 | **87%** | ✅ Excellent performance |
-| **Promotions** | 0.50 | 0.41 | 0.45 | **41%** | ⚠️ Moderate confusion |
-| **Updates** | 0.35 | 0.31 | 0.33 | **31%** | ❌ High confusion |
-| **Inbox** | 0.33 | 0.24 | 0.28 | **24%** | ❌ Very high confusion |
+| **Promotions** | 0.50 | 0.41 | 0.45 | **41%** | Moderate confusion |
+| **Updates** | 0.35 | 0.31 | 0.33 | **31%** |  High confusion |
+| **Inbox** | 0.33 | 0.24 | 0.28 | **24%** |  Very high confusion |
 
 #### Confusion Matrix
 
@@ -146,21 +146,12 @@ Created a production-ready web application featuring:
 - **Color-coded predictions** with category descriptions
 - **Confidence visualization** for prediction strength
 
-**Technical Implementation:**
-```r
-predict_email <- function(subject, body_text) {
-  full_text <- paste(subject, body_text, sep = " ") %>%
-    clean_text() %>%
-    create_tfidf_features()
-  
-  prediction <- predict(nb_model, full_text)
-  return(prediction)
-}
 ```
 
 ### Lessons Learned from Part 1
 
 **Successes:**
+
 ✅ Completed end-to-end ML pipeline from data collection to deployment  
 ✅ Created functional interactive application  
 ✅ Identified category-specific performance patterns  
