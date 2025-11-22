@@ -1,0 +1,96 @@
+---
+title: "split_large_email"
+author: "Candace Grant"
+date: "2025-11-19"
+output: 
+ html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load the necessary libraries
+
+```{r}
+library(tidyverse)
+```
+
+## Function to split large email content into smaller chunks
+
+```{r}
+
+library(tidyverse)
+
+# Function to split a large CSV file into smaller chunks
+split_csv_file <- function(input_file, output_prefix, chunk_size = 500) {
+  
+  cat(paste("Processing:", input_file, "\n"))
+  
+  # Read the file
+  data <- read_csv(input_file, show_col_types = FALSE)
+  
+  # Calculate number of chunks needed
+  total_rows <- nrow(data)
+  num_chunks <- ceiling(total_rows / chunk_size)
+  
+  cat(paste("Total rows:", total_rows, "\n"))
+  cat(paste("Creating", num_chunks, "chunks of ~", chunk_size, "rows each\n\n"))
+  
+  # Split and save
+  for (i in 1:num_chunks) {
+    start_row <- (i - 1) * chunk_size + 1
+    end_row <- min(i * chunk_size, total_rows)
+    
+    chunk_data <- data[start_row:end_row, ]
+    output_file <- paste0(output_prefix, "_part", i, ".csv")
+    
+    write_csv(chunk_data, output_file)
+    
+    # Get file size
+    file_size <- file.info(output_file)$size / (1024^2)  # Convert to MB
+    cat(paste("Created:", output_file, 
+              "| Rows:", nrow(chunk_data), 
+              "| Size:", round(file_size, 2), "MB\n"))
+  }
+  
+  cat(paste("\n✓ Finished splitting", input_file, "\n"))
+  cat(paste0(rep("=", 70), collapse = ""), "\n\n")
+}
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+# Set your working directory to where your CSV files are located
+# setwd("path/to/your/email/files")
+
+# Split inbox.csv
+if (file.exists("inbox.csv")) {
+  split_csv_file(
+    input_file = "inbox.csv",
+    output_prefix = "inbox",
+    chunk_size = 500  # Adjust if needed - smaller = more files but smaller size
+  )
+} else {
+  cat("  inbox.csv not found in current directory\n\n")
+}
+
+# Split updates.csv  
+if (file.exists("updates.csv")) {
+  split_csv_file(
+    input_file = "updates.csv", 
+    output_prefix = "updates",
+    chunk_size = 500  # Adjust if needed
+  )
+} else {
+  cat("  updates.csv not found in current directory\n\n")
+}
+
+cat("\n All done! You can now upload the smaller _part files.\n")
+
+```
+
