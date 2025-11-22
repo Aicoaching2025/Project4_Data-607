@@ -75,12 +75,12 @@ I chose to tackle my personal email organization as the "ambitious" option becau
 
 ### Results
 
-#### Overall Performance
+### Overall Performance
 - **Overall Accuracy:** 55.0%
 - **Training Time:** ~45 seconds
 - **Prediction Time:** <1 second per email
 
-#### Per-Category Performance
+### Per-Category Performance
 
 | Category | Precision | Recall | F1-Score | Accuracy | Observations |
 |----------|-----------|--------|----------|----------|--------------|
@@ -89,7 +89,7 @@ I chose to tackle my personal email organization as the "ambitious" option becau
 | **Updates** | 0.35 | 0.31 | 0.33 | **31%** |  High confusion |
 | **Inbox** | 0.33 | 0.24 | 0.28 | **24%** |  Very high confusion |
 
-#### Confusion Matrix
+### Confusion Matrix
 
 ```
                     Predicted
@@ -105,9 +105,9 @@ Updates           43      28         2       50      ← 43 confused with Inbox
 
 ![Confusion Matrix](confusion_matrix_naive_bayes.png)
 
-### Key Findings & Analysis
+## Key Findings & Analysis
 
-#### Finding 1: Category Distinctiveness is Critical
+### Finding 1: Category Distinctiveness is Critical
 
 **Social media emails achieved 87% accuracy** because they contain highly distinctive vocabulary:
 - Platform-specific terms: "Facebook", "LinkedIn", "Instagram", "Twitter"
@@ -116,7 +116,7 @@ Updates           43      28         2       50      ← 43 confused with Inbox
 
 These terms rarely appear in other email categories, creating clear decision boundaries.
 
-#### Finding 2: Vocabulary Overlap Causes Confusion
+### Finding 2: Vocabulary Overlap Causes Confusion
 
 **Inbox, Promotions, and Updates struggled (24-41% accuracy)** due to shared transactional language:
 - Order-related: "order", "shipping", "delivery", "tracking", "confirmation"
@@ -131,7 +131,7 @@ These terms rarely appear in other email categories, creating clear decision bou
 
 All three contain "order", "shipping", and calls-to-action, making them linguistically similar.
 
-#### Finding 3: Small Dataset Limitations
+### Finding 3: Small Dataset Limitations
 
 With only 800 training samples per category (2,560 total):
 - **Feature/sample ratio:** 500 features ÷ 2,560 samples = 0.20
