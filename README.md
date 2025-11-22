@@ -158,9 +158,6 @@ Created a production-ready web application featuring:
 ✅ Gained insights into text similarity challenges  
 
 
-**Critical Insight:**
-> *The choice of classification problem matters as much as the model itself. Some categorization schemes are inherently more difficult than others due to vocabulary overlap, regardless of model sophistication.*
-
 ---
 
 ## 🔬 Part 2: Spam/Ham Classification (Standard Assignment)
