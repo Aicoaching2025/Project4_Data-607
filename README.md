@@ -16,7 +16,7 @@ For this project, the MS Data Science, DATA 607 class was given two options:
 ### Option 1: Standard Assignment
 Build a spam/ham classifier using established public datasets
 
-### Option 2: Ambitious Alternative (Selected)
+### Option 2: Ambitious Alternative 
 Use a different labeled dataset of personal choice
 
 **My Approach:** I completed **both options** to gain deeper insights into text classification challenges and to compare performance across problem formulations.
