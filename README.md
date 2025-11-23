@@ -37,7 +37,7 @@ Use a different labeled dataset of personal choice
 
 ---
 
-## 📊 Part 1 Results: Personal Inbox Classification
+## 📊 Part 1 Results: Personal Inbox Classification✅  https://rpubs.com/Candace63/Spam_Ham_Classification
 
 ### Methodology
 
