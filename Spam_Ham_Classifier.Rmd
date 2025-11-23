@@ -1,6 +1,6 @@
 ---
 title: "Spam|Ham Email Classifier - Complete Analysis & Testing"
-author: "Candace"
+author: "Candace Grant"
 date: "November 17, 2025"
 output:
   html_document:
@@ -23,17 +23,6 @@ knitr::opts_chunk$set(
   fig.align = 'center'
 )
 ```
-
-# Executive Summary
-
-This document does **EVERYTHING** in one place:
-1. ✅ Trains the spam classifier
-2. ✅ Evaluates performance
-3. ✅ Tests new emails
-
-**Results:** 95-99% accuracy in detecting spam emails.
-
----
 
 # Load Libraries
 
@@ -109,7 +98,7 @@ load_emails <- function(spam_folder, ham_folder, n_samples = 500) {
 emails <- load_emails(
   spam_folder = "/Users/candace/Documents/Email_Classification_Project/spam",
   ham_folder = "/Users/candace/Documents/Email_Classification_Project/easy_ham",
-  n_samples = 500
+  n_samples = Inf
 )
 
 cat(sprintf("\nTotal: %d emails\n", nrow(emails)))
@@ -356,11 +345,32 @@ cat(sprintf("   Spam: %.1f%%\n", result$spam_prob * 100))
 cat(sprintf("   Ham:  %.1f%%\n\n", result$ham_prob * 100))
 ```
 
-## TEST YOUR OWN EMAIL HERE!
+## TEST YOUR OWN SPAM HERE!
 
 ```{r test-spam email}
-# Test Your Email HereL:
-my_test_email <- "Enter your email text here to test it!"
+# Test Your Email Here:
+my_test_email <- "Getting too Many emails from us? – Please click on the one click unsubscribe link at the bottom of this email
+
+Candace
+Greetings
+My name is Manav and I'm a Talent Development Manager at SynergisticIT Our records show that you are currently in the job market and actively searching for jobs . Your background suits our program needs.Please see the direct Synergisticit JOPP ROI breakdown against any college degree.
+
+Why Choose SynergisticIT for Your Tech Career?
+
+SynergisticIT stands apart as a pioneer in tech upskilling and job placement. Since 2010, we have empowered thousands of candidates to land roles at Fortune 500 companies such as Apple, Google, Walmart Labs, Ford Motors, Bank of America, Visa, Wells Fargo, Intel, Citi, BHN, JPMC, Walgreens, Autozone, PayPal, Deloitte, and more and get salaries ranging anywhere from $90,000 per annum to $154,000. Our programs are not just about learning—they are about getting hired. We offer:Are you tired of sending out résumés with little to no reply? Frustrated by interview rejections despite your college degree only to find the job market colder and tougher than expected? You’re not alone. In 2025, the gap between tech job education and real hiring requirements has never been larger.
+Please check below and explore the program :
+Synergisticit Job Placement Program: Get Hired for Tech Jobs
+Explore our specialized programs in JOPP
+Java Devops full stack Job placement Program: Get Hired for Java Devops Full stack Jobs.
+Data Science Job Placement Program: Get hired for data Analyst Data Scienitsit jobs 
+At SynergisticIT, we specialize in transforming aspiring professionals into in-demand Data Scientists and Java DevOps Engineers. With over 15 years of proven experience, a network of 24,000+ tech clients, and a placement rate exceeding 91%, our job placement programs are designed to help you achieve your career ambitions—no matter your starting point.
+We Focus on Java /Full stack/Devops and Data Science /Data Engineers/Data analysts/BI Analysts/ Machine learning/AI candidates
+ 
+.........................
+Note: Please allow me to reiterate that I chose to contact you either because your resume had been posted to one of the internet job sites to which we subscribe, or you had previously submitted your resume to our openings I assumed that you are either looking for a new employment opportunity, or you are interested in investigating the current job market.
+If you are not currently seeking employment, or if you would prefer, I contact you at some later date, please indicate your date of availability so that I may honor your request. In any event, I respectfully recommend you continue to avail yourself to the employment options and job market information we provide with our e-mail notices.
+Thanks again
+"
 
 # Run prediction
 result <- predict_email(my_test_email, rf_model)
@@ -376,10 +386,18 @@ cat(sprintf("   Spam: %.1f%%\n", result$spam_prob * 100))
 cat(sprintf("   Ham:  %.1f%%\n", result$ham_prob * 100))
 cat("\n", rep("=", 70), "\n")
 ```
-```{r test-inbox|ham email}
-# Test Your Email HereL:
-my_test_email <- "Enter your email text here to test it!"
 
+## TEST YOUR OWN INBOX/HAM EMAIL HERE!
+
+```{r test-inbox|ham email}
+# Test Your Email Here:
+my_test_email <- "DataExpert.io Community Academy
+You're receiving this email from DataExpert.io Community Academy.
+
+I am going live on Monday at 9 AM to celebrate 500k Followers on LinkedIn!
+You can join on:YouTube https://youtube.com/live/i-viVzI8-54?feature=share
+LinkedIn https://www.linkedin.com/posts/eczachly_500k-linkedin-followers-celebration-live-activity-7398116664896069632-n6-D
+Excited to see you there! (there will be extra special things)"
 # Run prediction
 result <- predict_email(my_test_email, rf_model)
 
@@ -400,7 +418,7 @@ cat("\n", rep("=", 70), "\n")
 
 ## What This Document Did
 
-1. Loaded 1,000 emails (500 spam + 500 ham)
+1. Loaded emails
 2. Preprocessed text (cleaned, stemmed, created features)
 3. Trained Random Forest model (500 trees)
 4. Achieved **`r round(accuracy * 100, 1)`% accuracy**
@@ -423,8 +441,5 @@ cat("\n", rep("=", 70), "\n")
 3. Click the green "Run" button for that chunk
 4. See your prediction!
 
-**To retrain with different data:**
-1. Change the folder paths at the top
-2. Click "Knit to HTML" again
 
 
